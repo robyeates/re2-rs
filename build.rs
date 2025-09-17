@@ -67,6 +67,7 @@ fn main() {
             || path_str.contains("mock_log")
             || fname.ends_with("_test_common.cc")
             || path_str.contains("testing") {
+            println!("file name {}, path str {} being skipped, drop them from vendor", fname, path_str);
             continue; // skip unit tests/benchmarks
         }
         build.file(path);

@@ -1,0 +1,19 @@
+[package]
+name = "re2-sys"
+version = "0.0.9+minimised"
+edition = "2024"
+links = "re2"
+build = "build.rs"
+
+[dependencies]
+bindgen = "0.72.1"
+cc = "1"
+eyre = "0.6"
+libc = "0.2"
+
+[build-dependencies]
+pkg-config = "0.3"
+bindgen = "0.72.1"
+cc = "1.2.37"
+eyre = "0.6.12"
+glob = "0.3.3"

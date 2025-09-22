@@ -1,4 +1,4 @@
-use re2_sys::Regex;
+use re2_rs_wrapper::{Options, Regex};
 
 #[test]
 fn wrapper_partial_match() {
@@ -99,12 +99,3 @@ fn unicode_mixed_word_with_digits() {
     assert!(re.full_match("Ω123"));
     assert!(!re.full_match("123456")); // only digits
 }
-
-
-//#[test] For ICU
-//fn unicode_case_folding_with_icu() {
-//    // Only works if RE2 was built with ICU
-//    let re = Regex::new(r"(?i)^straße$").unwrap();
-//    assert!(re.full_match("Straße"));
-//    assert!(re.full_match("STRASSE")); // ICU case folding turns ß into SS
-//}

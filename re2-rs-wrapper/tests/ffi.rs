@@ -1,5 +1,5 @@
 use std::ffi::CString;
-use re2_sys::ffi::*;
+use re2_rs_sys::{re2_delete, re2_full_match, re2_new, re2_ok};
 
 #[test]
 fn ffi_simple_match() {

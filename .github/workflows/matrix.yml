@@ -26,6 +26,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Run xtask (generate bindings)
+        run: cargo run -p xtask
+
       - name: Install grcov
         run: cargo install grcov --locked
 
@@ -49,11 +52,11 @@ jobs:
 
       - name: Build (no ICU)
         if: matrix.icu == 'false'
-        run: cargo build --workspace --all-targets
+        run: cargo build -p re2-rs
 
       - name: Build (with ICU)
         if: matrix.icu == 'true'
-        run: cargo build -p re2-rs-icu --features icu --all-targets
+        run: cargo build -p re2-rs-icu --features icu
 
       - name: Test (no ICU)
         if: matrix.icu == 'false'

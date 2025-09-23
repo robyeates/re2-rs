@@ -68,10 +68,12 @@ jobs:
         run: cargo test -p re2-rs-icu --features icu
 
       - name: Generate coverage report
+        shell: bash
         run: |
           mkdir -p target/coverage
           grcov . \
             --binary-path ./target/debug/ \
+            --binary-path ./target/debug/deps/ \
             -s . \
             -t lcov \
             --branch \
@@ -85,3 +87,5 @@ jobs:
         with:
           files: target/coverage/lcov.info
           fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+

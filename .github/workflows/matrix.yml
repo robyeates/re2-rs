@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, ICU=${{ matrix.icu }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        icu: [false, true]
+
+    env:
+      CARGO_TERM_COLOR: always
+      RUSTFLAGS: "-Cinstrument-coverage"
+      LLVM_PROFILE_FILE: "target/coverage/%p-%m.profraw"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install grcov
+        run: cargo install grcov --locked
+
+      # ICU setup only for Windows when matrix.icu == true
+      - name: Setup ICU (Windows)
+        if: matrix.os == 'windows-latest' && matrix.icu == 'true'
+        run: |
+          curl -LO https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip
+          unzip icu4c-77_1-Win64-MSVC2022.zip -d $HOME/icu
+          echo "ICU_ROOT=$HOME/icu" >> $GITHUB_ENV
+
+      # ICU install for Linux/macOS when matrix.icu == true
+      - name: Setup ICU (Linux/macOS)
+        if: matrix.os != 'windows-latest' && matrix.icu == 'true'
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            sudo apt-get update && sudo apt-get install -y libicu-dev pkg-config
+          else
+            brew install icu4c pkg-config
+          fi
+
+      - name: Build (no ICU)
+        if: matrix.icu == 'false'
+        run: cargo build --workspace --all-targets
+
+      - name: Build (with ICU)
+        if: matrix.icu == 'true'
+        run: cargo build -p re2-rs-icu --features icu --all-targets
+
+      - name: Test (no ICU)
+        if: matrix.icu == 'false'
+        run: cargo test -p re2-rs
+
+      - name: Test (with ICU)
+        if: matrix.icu == 'true'
+        run: cargo test -p re2-rs-icu --features icu
+
+      - name: Generate coverage report
+        run: |
+          mkdir -p target/coverage
+          grcov . \
+            --binary-path ./target/debug/ \
+            -s . \
+            -t lcov \
+            --branch \
+            --ignore-not-existing \
+            --ignore "/*" \
+            --ignore "tests/*" \
+            -o target/coverage/lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: target/coverage/lcov.info
+          fail_ci_if_error: true

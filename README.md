@@ -1,41 +1,62 @@
 <p align="center">
-  <img src="assets/logo.png" width="200" alt="My Crate Logo">
+  <img src="assets/re2_sm.png" width="150" alt="My Crate Logo">
 </p>
 <h1 align="center">re2-rs</h1>
-<p align="center">✨ A fast, safe, and ergonomic  library for RE2 Rust bindings ✨</p>
+<p align="center">🔍 (Will be) Fast, safe, and ergonomic Rust bindings for RE2 with ICU 🧩</p>
 
-[![Crates.io](https://img.shields.io/crates/v/my_crate.svg)](https://crates.io/crates/my_crate)
-[![Docs.rs](https://docs.rs/my_crate/badge.svg)](https://docs.rs/my_crate)
-[![Build](https://github.com/user/my_crate/actions/workflows/ci.yml/badge.svg)](https://github.com/user/my_crate/actions)
-[![License](https://img.shields.io/crates/l/my_crate)](#license)
+*** 
+<p align="center">
+  <a href="https://crates.io/crates/my_crate">
+    <img src="https://img.shields.io/crates/v/my_crate.svg" alt="Crates.io">
+  </a>
+  <a href="https://docs.rs/my_crate">
+    <img src="https://docs.rs/my_crate/badge.svg" alt="Docs.rs">
+  </a>
+  <a href="https://github.com/user/my_crate/actions">
+    <img src="https://github.com/user/my_crate/actions/workflows/ci.yml/badge.svg" alt="Build Status">
+  </a>
+  <a href="#license">
+    <img src="https://img.shields.io/crates/l/my_crate" alt="License">
+  </a>
+</p>
 
+***
 
-=======
-Forked to work around some hard dependencies of the existing crate. Look to push back upstream.
+This project began as a fork to work around hard dependencies in the existing ecosystem,  
+but has since grown into a fully standalone set of crates.
 
-Vendored in RE2 and abseil to avoid `pkg-config`
+Dependencies are vendored directly to ensure reproducible builds and to keep `re2-rs` minimal.  
+The goal is to provide a **small, dependency-free baseline (`re2-rs`)** with the essential RE2  
+features, and a **superset (`re2-rs-icu`)** that exposes ICU’s extended Unicode functionality.
 
-* RE2 - 2025-08-12
-* Abseil - 20250512.1 - From https://github.com/google/re2/blob/2025-08-12/MODULE.bazel
-* ICU - release-77-1
+Vendored versions are pinned to exact upstream releases:
+
+- **RE2**: 2025-08-12
+- **Abseil**: 20250512.1 (from [RE2’s `MODULE.bazel`](https://github.com/google/re2/blob/2025-08-12/MODULE.bazel))
+- **ICU**: release-77-1
 
 ### RE2 Rust Bindings: ICU vs Non-ICU
-
-| Feature                          | `re2-rs` (no ICU) | `re2-rs-icu` (with ICU) |
+ Feature                          | `re2-rs` (no ICU) | `re2-rs-icu` (with ICU) |
 |----------------------------------|-------------------|--------------------------|
 | ASCII matching (`\d`, `\w`, `\b`) | ✅ Supported       | ✅ Supported              |
 | Unicode digit matching (`\d`)     | ❌ ASCII only      | ✅ All `Nd` digits (e.g. ٣٤٥) |
-| Unicode word boundaries (`\b`)    | ❌ ASCII only      | ✅ Works across all scripts (e.g. Greek, Cyrillic, etc.) |
+| Unicode word boundaries (`\b`)    | ❌ ASCII only      | ✅ With `Options::unicode_word_boundaries(true)` |
 | Unicode case folding (`(?i)`)     | ❌ ASCII only      | ✅ Full Unicode (ß → SS, Greek, Cyrillic, etc.) |
 | POSIX syntax (`Options::posix_syntax`) | ✅ Supported | ✅ Supported              |
-| Longest match (`Options::longest_match`) | ✅ Supported | ✅ Supported              |
-| Unicode script / property classes (`\p{Greek}`, `\p{Cyrillic}`, etc.) | ❌ Unsupported | ✅ Supported |
-| Emoji support (`\p{Emoji}`)       | ❌ Unsupported     | ✅ Supported (e.g. 😀👍)   |
-| Collation-sensitive matching      | ❌ Unsupported     | ✅ Supported              |
+| Longest match (`Options::longest_match`) | ⚠️ Compiles, but no effect via wrapper yet | ⚠️ Same — needs C++ shim work to expose |
+| Unicode script / property classes (`\p{Greek}`, `\p{Cyrillic}`, etc.) | ⚠️ Limited set (built-in RE2 tables) | ✅ Full ICU property set |
+| Emoji support (`\p{Emoji}` etc.)  | ❌ Unsupported     | ✅ Supported (e.g. 😀👍, modifier bases, etc.) |
+| Collation-sensitive matching      | ❌ Unsupported     | ❌ Unsupported (requires ICU regex, not RE2) |
 
-
+> Notes:
+> - `\d`, `\w`, `\b` are **ASCII-only** unless `unicode_word_boundaries(true)` is enabled.
+> - **re2-rs** provides a limited set of Unicode scripts/categories baked into RE2.
+> - **re2-rs-icu** exposes ICU’s full property set, case folding, digits, emoji, etc.
+> - `longest_match` is not currently observable through this wrapper.
+> - Collation-sensitive regex is only available in ICU’s own regex engine, not RE2.
 
 ```mermaid
+%%{init: {"theme":"dark", "themeVariables": { "fontSize": "12px" }, "scale": 0.6 }}%%
 graph TD
     subgraph Native
         CppSources["RE2 + Abseil (C++)"]
@@ -57,37 +78,6 @@ graph TD
 
 ```
 
-### re2-rs-sys 🔴
-Low-level FFI bindings.
-* Owns all the C++ compilation (build.rs).
-* Owns c-bindings.cc / c-bindings.h.
-* Exposes raw FFI (extern "C" { ... }).
-* Unsafe, not for direct use
-
-### re2-rs-wrapper 🟠
-Safe, idiomatic Rust API.
-* Defines the Regex and Options types.
-* Wraps re2-rs-sys functions with error handling and lifetimes.
-* Feature icu enables ICU-aware constructors (with_options).
-
-### re2-rs 🟢
-Public crate for plain RE2.
-* Re-exports the safe API from re2-rs-wrapper.
-* Compiled without ICU feature.
-
-### re2-rs-icu 🟢
-Public crate for RE2 with ICU.
-* Re-exports the same safe API.
-* Compiled with ICU feature, enabling Regex::with_options and Unicode folding.
-
-### tests/ (in parent)
-
-* Runs against both crates.
-    * common.rs: shared functionality.
-    * unicode.rs: ICU-specific tests.
-
-Uses [dev-dependencies] in the parent Cargo.toml to pull in both wrappers.
-
 ### 🚀 Pipeline
 
 `cargo test -p re2-rs` → runs crate-local + shared tests (common.rs).
@@ -96,11 +86,7 @@ Uses [dev-dependencies] in the parent Cargo.toml to pull in both wrappers.
 
 `cargo test` in the workspace → runs everything.
 
-E2’s Options like set_case_sensitive(false), set_posix_syntax(true)),
-so you can test ICU features like collation and script matching?
-ICU-specific extensions (case folding, script properties, etc).    
-
-regen bindings (avoids llvm requirement) 
+Regen bindings (avoid llvm requirement by using the bundled `bindings.rs`) 
 
 `cargo run -p xtask` -- regen-bindings
 
@@ -108,69 +94,69 @@ regen bindings (avoids llvm requirement)
 
 `cargo build -p re2-rs-icu --features icu` → ICU gets built in.
 
+### Building with ICU (`re2-rs-icu`)
 
-# TODO
-**Fix version numbers!**
+The `re2-rs-icu` crate depends on ICU. How it is linked depends on the platform:
 
-**Github action to matrix build it - without and without bindgen**
+#### Windows
+On Windows, you need to supply a prebuilt ICU distribution. The build script looks for an environment 
+variable `ICU_ROOT` pointing to an unpacked ICU zip.
 
-If you need normalization (NFC/NFKC) or locale collation, do it as a preprocess with ICU, then feed the result to RE2. //TODO how?
-Features Still Missing or Under-Tested
+Example (ICU 77.1, MSVC 2022 build): - [icu4c-77_1-Win64-MSVC2022.zip](https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip)
 
-Anchors and line modes
+Unpack this somewhere and set:
 
-(?m) multi-line → ^/$ match start/end of line.
+```powershell
+setx ICU_ROOT "C:\path\to\icu4c-77_1-Win64-MSVC2022"
+```
+Then build:
 
-(?s) dotall → . matches newlines.
+`cargo build -p re2-rs-icu --features icu`
 
-Tests missing: especially with Unicode newlines.
+The build will link against `ICU_ROOT\include` and `ICU_ROOT\lib64`, and attempt to copy
+the required DLLs into Cargo’s target\...\deps directory so tests can run.
 
-Word boundaries with mixed scripts
+Expected DLLs (for ICU 77.1):
 
-ICU \b should handle boundaries between scripts (e.g. Latin + Cyrillic).
+* icuuc77.dll
+* icuin77.dll
+* icudt77.dll
+* icutu77.dll
 
-Test missing: "HelloЗдравей" shouldn’t count as a single word.
+⚠️ Note: Windows builds are currently aimed at development and testing only.
+If the DLLs are not found or not copied, you may see STATUS_DLL_NOT_FOUND when running tests.
+Static linking of ICU is not supported at this time.
 
-Collation-sensitive matching (ICU)
+Linux / macOS
 
-RE2+ICU can use ICU collators for locale-sensitive string equivalence.
+On Unix platforms, ICU is discovered via pkg-config.
+Install the system ICU development libraries (e.g. libicu-dev on Debian/Ubuntu, icu on Fedora, icu4c on macOS/Homebrew), then build as usual:
 
-Not in your wrapper yet (re2::RE2::Options::set_collator).
+cargo build -p re2-rs-icu --features icu
 
-Unicode categories
 
-\p{L} (letters), \p{Nd} (decimal digits), \p{P} (punctuation), etc.
+ℹ️ The build script first checks ICU_ROOT (Windows).
+If unset, it falls back to pkg-config (Linux/macOS).
 
-Tests missing: show broad categories beyond Greek/Cyrillic.
+## TODO
+* Dedupe tests
+* Docs, link the (corrected) feature table to test line number
+* Github action to matrix build it - without and without bindgen
+* Add full `Anchor` support - `longest_match` currently doesn't pass through the shim
+* Improve error handling - [spack-rs](https://github.com/cosmicexplorer/spack-rs/blob/main/re2/src/error.rs) has a full shim
+* Other features as required
 
-Replace semantics with Unicode
+### Might do
+* Expose normalisation (NFC/NFD) from ICU e.g.
+   * ```
+      let normalizer = Normalizer2::get_nfc_instance().unwrap();
+     
+      let pattern = normalizer.normalize("café").unwrap();
+      let text = normalizer.normalize("cafe\u{301}").unwrap();
 
-Regex::replace_one / replace_all are implemented.
+      let re = Regex::new(&pattern).unwrap();
+      assert!(re.full_match(&text));```    
 
-Tests missing: e.g. replace emoji with placeholder, or fold case + replace.
+### Probably not doing
+* Collation-sensitive matching - RE2 doesn't have this, it's extending/forking to deliver this 
 
-Match longest vs shortest (longest_match)
-
-Should be tested explicitly with Unicode text.
-
-🟢 Next Steps (Recommendations)
-
-Add ICU option shims for:
-
-re2_options_set_unicode_case
-
-re2_options_set_unicode_word_boundaries
-
-(optionally) re2_options_set_collator
-
-Expand test coverage:
-
-Anchors ((?m), (?s)) with Unicode input.
-
-Mixed-script boundaries (Latin + Cyrillic/Greek).
-
-General Unicode categories (\p{L}, \p{P}, etc.).
-
-Replace tests with Unicode/emoji.
-
-Collation tests (once bindings are in).

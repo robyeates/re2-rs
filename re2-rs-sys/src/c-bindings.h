@@ -24,9 +24,9 @@ typedef struct RE2Options RE2Options;
 
 RE2Options* re2_options_new(void);
 void        re2_options_delete(RE2Options*);
-void        re2_options_set_case_sensitive(RE2Options*, int sensitive);
-void        re2_options_set_posix_syntax(RE2Options*, int posix);
-void        re2_options_set_longest_match(RE2Options*, int longest);
+void        re2_options_set_case_sensitive(RE2Options* o, int sensitive);
+void        re2_options_set_posix_syntax(RE2Options* o, int posix);
+void        re2_options_set_longest_match(RE2Options* o, int longest);
 void        re2_options_set_word_boundary(RE2Options* o, int yes);
 void        re2_options_set_perl_classes(RE2Options* o, int yes);
 

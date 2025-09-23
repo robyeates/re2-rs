@@ -2,9 +2,11 @@
 
 mod bindings;
 
+#[allow(dead_code)]
 #[cfg(feature = "bindgen")]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+#[allow(dead_code)]
 #[cfg(not(feature = "bindgen"))]
 mod prebuilt {
     // ship a static version for people without clang/bindgen installed

@@ -10,7 +10,7 @@ re2-rs-wrapper = { path = "../re2-rs-wrapper", features = ["icu"] }
 icu = ["re2-rs-wrapper/icu"]
 
 [lib]
-name = "re2_icu"
+name = "re2_rs_icu"
 path = "src/lib.rs"
 
 

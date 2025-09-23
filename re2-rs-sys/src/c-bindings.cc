@@ -34,10 +34,10 @@ void re2_options_set_longest_match(RE2Options* o, int longest) {
 }
 // ICU-related toggles
 void re2_options_set_word_boundary(RE2Options* o, int yes) {
-    if (!o) o->opts.set_word_boundary(yes != 0);
+    if (o) o->opts.set_word_boundary(yes != 0);
 }
 void re2_options_set_perl_classes(RE2Options* o, int yes) {
-    if (!o) o->opts.set_perl_classes(yes != 0);
+    if (o) o->opts.set_perl_classes(yes != 0);
 }
 
 

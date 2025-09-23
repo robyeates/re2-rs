@@ -1,7 +1,31 @@
 use std::{env, fs, path::PathBuf, process::Command};
 use std::path::Path;
 
+
 fn main() {
+    /*
+     * --- Build re2-rs / re2-rs-icu ---
+     *
+     * 1. ICU
+     *    - Linked dynamically if the `icu` feature is enabled.
+     *    - We do not vendor ICU source here: shipping the full tree would bloat the crate (>100 MB).
+     *    - On Linux/macOS: expect ICU to be available via system packages (e.g. libicu-dev, icu-devel, or Homebrew icu4c).
+     *    - On Windows: expect a prebuilt ICU release to be downloaded/unzipped and exposed via the
+     *      ICU_ROOT environment variable. Example:
+     *      https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip
+     *
+     * 2. Abseil
+     *    - Required by RE2.
+     *    - Lightweight, can be built directly with `cc` from vendored sources.
+     *
+     * 3. RE2
+     *    - Core regular expression engine.
+     *    - Also small enough to vendor and build directly.
+     *
+     * 4. re2-rs bindings
+     *    - Unsafe C bindings (c-bindings.cc/h) wrapping RE2 for use in Rust.
+     *    - Bindings are either generated with `bindgen` or copied from a pregenerated file.
+     */
     let vendor = PathBuf::from("../vendor");
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let with_icu = cfg!(feature = "icu");
@@ -15,12 +39,11 @@ fn main() {
     println!("cargo:rerun-if-changed=src/c-bindings.h");
     println!("cargo:rerun-if-changed=../vendor/re2");
     println!("cargo:rerun-if-changed=../vendor/abseil-cpp");
-    println!("cargo:rerun-if-changed=../vendor/icu");
 
     if with_icu {
-        println!("--- Compiling ICU sources ---");
-        build_icu(&vendor, &out_dir, with_icu);
-        println!("--- Finished ICU ---");
+        println!("--- Linking ICU (system/prebuilt) ---");
+        link_icu();
+        println!("--- Finished ICU setup ---");
     }
 
     println!("--- Building Abseil (subset) ---");
@@ -66,36 +89,88 @@ fn main() {
     println!("=== build.rs end ===");
 }
 
-fn build_re2(vendor: PathBuf, with_icu: bool) {
-    let mut re2 = cc::Build::new();
+fn link_icu() {
 
-    re2.include(vendor.join("re2"));
-    re2.include(vendor.join("abseil-cpp"));
-
-    if with_icu {
-        re2.include(vendor.join("icu/source/common"));
-        re2.include(vendor.join("icu/source/i18n"));
+    // First try pkg-config (works on Linux, macOS with brew/pkg-config installed)
+    if pkg_config::Config::new().probe("icu-uc").is_ok() {
+        return;
     }
 
-    let compiler = re2.get_compiler();
-    let is_msvc = compiler.is_like_msvc();
+    if cfg!(target_os = "windows") {
+        let icu_root = match env::var("ICU_ROOT") {
+            Ok(path) => path,
+            Err(_) => {
+                println!("cargo:warning=ICU_ROOT not set. Please download and unzip a prebuilt ICU, e.g.:");
+                println!("cargo:warning=  https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip");
+                println!("cargo:warning=Set ICU_ROOT to the extracted folder (containing include/, lib64/, bin64/).");
+                panic!("ICU_ROOT not set; cannot build with ICU on Windows");
+            }
+        };
 
-    add_common_defines(&mut re2, is_msvc, with_icu);
+        let include = PathBuf::from(&icu_root).join("include");
+        let lib = PathBuf::from(&icu_root).join("lib64");
+        let bin = PathBuf::from(&icu_root).join("bin64");
 
-    for entry in glob::glob("../vendor/re2/*.cc").unwrap() {
-        let file = entry.unwrap();
-        println!("RE2 {}", file.display());
-        re2.file(&file);
+        println!("cargo:include={}", include.display());
+        println!("cargo:rustc-link-search=native={}", lib.display());
+
+        // Dynamic linking to ICU DLLs
+        println!("cargo:rustc-link-lib=dylib=icuuc");
+        println!("cargo:rustc-link-lib=dylib=icuin");
+        println!("cargo:rustc-link-lib=dylib=icudt");
+
+        //dev convenience - makes running local tests more straigjhtf
+        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+        println!("cargo:warning=OUT_DIR = {}", out_dir.display());
+
+        // ../../../ back to target/
+        let target_dir = out_dir.ancestors().nth(3).unwrap();
+        println!("cargo:warning=target_dir = {}", target_dir.display());
+
+        let deps_dir = target_dir.join("deps");
+        println!("cargo:warning=deps_dir = {}", deps_dir.display());
+
+        for dll in ["icuuc77.dll", "icuin77.dll", "icudt77.dll", "icutu77.dll"] {
+            let src = bin.join(dll);
+            let dst = deps_dir.join(dll);
+
+            println!("cargo:warning=Looking for DLL: {}", src.display());
+            println!("cargo:warning=Copying to   : {}", dst.display());
+
+            if let Err(e) = std::fs::copy(&src, &dst) {
+                println!("cargo:warning=Could not copy {}: {}", dll, e);
+            } else {
+                println!("cargo:warning=Copied {}", dll);
+            }
+        }
+
+        return;
     }
-    for entry in glob::glob("../vendor/re2/util/*.cc").unwrap() {
-        let file = entry.unwrap();
-        println!("RE2 UTIL {}", file.display());
-        re2.file(&file);
+
+    if cfg!(target_os = "macos") {
+        let brew_prefix = Command::new("brew")
+            .arg("--prefix")
+            .arg("icu4c")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+
+        if !brew_prefix.is_empty() {
+            let include = format!("{}/include", brew_prefix);
+            let lib = format!("{}/lib", brew_prefix);
+
+            println!("cargo:include={}", include);
+            println!("cargo:rustc-link-search=native={}", lib);
+            println!("cargo:rustc-link-lib=dylib=icuuc");
+            println!("cargo:rustc-link-lib=dylib=icui18n");
+            return;
+        }
+
+        panic!("Could not find ICU via pkg-config or Homebrew. Please install icu4c.");
     }
-
-    re2.file("src/c-bindings.cc");
-
-    re2.compile("re2_core");
 }
 
 fn build_absl(vendor: &Path, with_icu: bool) {
@@ -185,55 +260,37 @@ fn build_absl(vendor: &Path, with_icu: bool) {
     }
 }
 
+fn build_re2(vendor: PathBuf, with_icu: bool) {
+    let mut re2 = cc::Build::new();
 
-fn build_icu(vendor: &Path, out_dir: &Path, with_icu: bool) {
+    re2.include(vendor.join("re2"));
+    re2.include(vendor.join("abseil-cpp"));
 
-    let mut cc_probe = cc::Build::new();
-    cc_probe
-        .include(vendor.join("icu/common"))
-        .include(vendor.join("icu/common/unicode"))
-        .include(vendor.join("icu/i18n"))
-        .include(vendor.join("icu/i18n/unicode"));
+    if with_icu {
+        if let Ok(icu_root) = env::var("ICU_ROOT") {
+            re2.include(PathBuf::from(icu_root).join("include"));
+        }
+    }
 
-    let compiler = cc_probe.get_compiler();
+    let compiler = re2.get_compiler();
     let is_msvc = compiler.is_like_msvc();
 
-    add_common_defines(&mut cc_probe, is_msvc, with_icu);
-    if is_msvc {
-        add_msvc_includes(&mut cc_probe);
-    }
+    add_common_defines(&mut re2, is_msvc, with_icu);
 
-    let obj_suffix = if is_msvc { "obj" } else { "o" };
-
-    for entry in glob::glob("../vendor/icu/common/*.cpp")
-        .unwrap()
-        .chain(glob::glob("../vendor/icu/i18n/*.cpp").unwrap())
-    {
+    for entry in glob::glob("../vendor/re2/*.cc").unwrap() {
         let file = entry.unwrap();
-        let fname = file.file_name().unwrap();
-        let obj = out_dir.join(fname).with_extension(obj_suffix);
-
-        let path_str = file.display().to_string();
-        if path_str.contains("test") || path_str.contains("sample") || path_str.contains("bench") {
-            println!("SKIP ICU {}", path_str);
-            continue;
-        }
-
-        println!("ICU compile -> {}", path_str);
-
-        let mut cmd = Command::new(compiler.path());
-        cmd.args(compiler.args());
-        if is_msvc {
-            cmd.arg("/c").arg(&file).arg("/Fo").arg(&obj);
-        } else {
-            cmd.arg("-c").arg(&file).arg("-o").arg(&obj);
-        }
-
-        let status = cmd.status().expect("failed to spawn compiler");
-        assert!(status.success(), "ICU compilation failed for {:?}", file);
-
-        println!("cargo:rustc-link-arg={}", obj.display());
+        println!("RE2 {}", file.display());
+        re2.file(&file);
     }
+    for entry in glob::glob("../vendor/re2/util/*.cc").unwrap() {
+        let file = entry.unwrap();
+        println!("RE2 UTIL {}", file.display());
+        re2.file(&file);
+    }
+
+    re2.file("src/c-bindings.cc");
+
+    re2.compile("re2_core");
 }
 
 fn add_common_defines(build: &mut cc::Build, is_msvc: bool, with_icu: bool) {
@@ -247,45 +304,5 @@ fn add_common_defines(build: &mut cc::Build, is_msvc: bool, with_icu: bool) {
     if with_icu {
         build.define("RE2_WITH_ICU", None);
         build.define("RE2_USE_ICU", Some("1"));
-    }
-}
-
-//bodge for windows to ensure we get stddef.h, stdint.h etc. for ICU
-fn add_msvc_includes(build: &mut cc::Build) {
-    let compiler = build.get_compiler();
-    if !compiler.is_like_msvc() {
-        return;
-    }
-
-    // Check if INCLUDE env var is already set
-    if let Ok(include) = env::var("INCLUDE") {
-        for path in include.split(';') {
-            if !path.is_empty() {
-                build.include(path);
-            }
-        }
-        return;
-    }
-
-    println!("No INCLUDE found, running /Bv now");
-    // Fallback: query MSVC's default include paths via `cl /Bv`
-    match Command::new("cl").arg("/Bv").output() {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines() {
-                // Typical line: "Compiler Passes: ... -I C:\Program Files (x86)\..."
-                if let Some(idx) = line.find("-I") {
-                    let path = line[idx + 2..].trim();
-                    println!("cargo:warning=Adding MSVC include path from cl /Bv: {}", path);
-                    build.include(path);
-                }
-            }
-        }
-        Err(e) => {
-            println!(
-                "cargo:warning=Could not run `cl /Bv` to detect MSVC include paths: {}",
-                e
-            );
-        }
     }
 }

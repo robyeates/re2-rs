@@ -6,13 +6,10 @@ pub struct Regex {
 }
 
 impl Regex {
-    /// Always available (no ICU required)
     pub fn new(pattern: &str) -> Result<Self, String> {
         wrapper::compile_regex(pattern, None).map(|raw| Self { raw })
     }
 
-    /// Only available when built with ICU
-    #[cfg(feature = "icu")]
     pub fn with_options(pattern: &str, opts: &wrapper::Options) -> Result<Self, String> {
         wrapper::compile_regex(pattern, Some(opts)).map(|raw| Self { raw })
     }

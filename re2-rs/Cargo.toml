@@ -7,5 +7,5 @@ edition = "2024"
 re2-rs-wrapper = { path = "../re2-rs-wrapper" }
 
 [lib]
-name = "re2"
+name = "re2_rs"
 path = "src/lib.rs"

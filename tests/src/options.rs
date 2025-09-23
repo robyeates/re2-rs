@@ -25,7 +25,7 @@ fn posix_syntax_behavior() {
 fn emoji_case_insensitive_no_effect() {
     // Emojis don’t have case — so case_insensitive should not change behavior
     let opts = Options::new().case_insensitive(true);
-    let re = Regex::with_options("\\p{Emoji}", &opts).unwrap();
+    let re = Regex::with_options(r"^\p{Emoji}+$", &opts).unwrap();
 
     assert!(re.full_match("😀"));
     assert!(re.full_match("😀👍🚀"));

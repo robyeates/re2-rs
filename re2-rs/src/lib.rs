@@ -1,1 +1,1 @@
-pub use re2_rs_wrapper::Regex;
+pub use re2_rs_wrapper::*;

@@ -1,4 +1,4 @@
-use re2_rs_wrapper::{Options, Regex};
+use re2_rs_wrapper::{Regex};
 
 #[test]
 fn ascii_digit_matching_only() {
@@ -20,16 +20,8 @@ fn ascii_word_boundaries() {
 }
 
 #[test]
-fn case_sensitive_ascii_only() {
-    let re = Regex::new(r"^straße$").unwrap();
-    assert!(re.full_match("straße"));
-    assert!(!re.full_match("STRASSE")); // No ICU folding ß→SS
-}
-
-#[test]
 fn no_unicode_digit_support() {
     let re = Regex::new(r"^\d+$").unwrap();
-
     assert!(re.full_match("123"));    // ASCII works
     assert!(!re.full_match("٣٤٥"));  // Arabic-Indic digits should fail
 }
@@ -37,14 +29,13 @@ fn no_unicode_digit_support() {
 #[test]
 fn no_unicode_word_boundaries() {
     let re = Regex::new(r"\bκόσμος\b").unwrap();
-
     assert!(!re.partial_match("γειά σου κόσμος!")); // would work with ICU
 }
 
 #[test]
 fn no_unicode_case_folding() {
     let re = Regex::new(r"^straße$").unwrap();
-
     assert!(re.full_match("straße"));
     assert!(!re.full_match("STRASSE")); // ß→SS folding missing
 }
+

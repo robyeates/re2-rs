@@ -1,5 +1,3 @@
-mod ascii;
-
 fn main() {
-    println!("Hello, world!");
+    println!("shared test crate");
 }

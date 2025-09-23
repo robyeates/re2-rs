@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        icu: [false, true]
+        icu: ["false", "true"]
 
     env:
       CARGO_TERM_COLOR: always

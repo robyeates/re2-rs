@@ -1,0 +1,8 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2024"
+
+[dev-dependencies]
+re2-rs = { path = "../re2-rs" }
+re2-rs-icu = { path = "../re2-rs-icu" }

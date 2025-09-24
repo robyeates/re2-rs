@@ -1,0 +1,10 @@
+[package]
+name = "re2-rs-wrapper"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+re2-rs-sys = { path = "../re2-rs-sys", default-features = false }
+
+[features]
+icu = ["re2-rs-sys/icu"]

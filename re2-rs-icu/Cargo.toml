@@ -1,0 +1,18 @@
+[package]
+name = "re2-rs-icu"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+re2-rs-wrapper = { path = "../re2-rs-wrapper", features = ["icu"] }
+
+[features]
+icu = ["re2-rs-wrapper/icu"]
+
+[lib]
+name = "re2_rs_icu"
+path = "src/lib.rs"
+
+
+
+

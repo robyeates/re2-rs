@@ -10,7 +10,36 @@ struct RE2Wrapper {
         : re(pat, opts) {}
 };
 
+struct RE2Options {
+    re2::RE2::Options opts;
+};
+
 extern "C" {
+
+// ----- options -----
+RE2Options* re2_options_new() {
+    return new (std::nothrow) RE2Options();
+}
+void re2_options_delete(RE2Options* o) {
+    delete o;
+}
+void re2_options_set_case_sensitive(RE2Options* o, int sensitive) {
+    if (o) o->opts.set_case_sensitive(sensitive != 0);
+}
+void re2_options_set_posix_syntax(RE2Options* o, int posix) {
+    if (o) o->opts.set_posix_syntax(posix != 0);
+}
+void re2_options_set_longest_match(RE2Options* o, int longest) {
+    if (o) o->opts.set_longest_match(longest != 0);
+}
+// ICU-related toggles
+void re2_options_set_word_boundary(RE2Options* o, int yes) {
+    if (o) o->opts.set_word_boundary(yes != 0);
+}
+void re2_options_set_perl_classes(RE2Options* o, int yes) {
+    if (o) o->opts.set_perl_classes(yes != 0);
+}
+
 
 RE2Wrapper* re2_new(const char* pattern, size_t pattern_len, const char** err_ptr, size_t* err_len) {
     re2::StringPiece pat(pattern, pattern_len);
@@ -33,6 +62,33 @@ RE2Wrapper* re2_new(const char* pattern, size_t pattern_len, const char** err_pt
     }
     return w;
 }
+
+// ----- construct with options -----
+RE2Wrapper* re2_new_with_options(const char* pattern, size_t pattern_len,
+                                 const RE2Options* opts,
+                                 const char** err_ptr, size_t* err_len) {
+    re2::StringPiece pat(pattern, pattern_len);
+    re2::RE2::Options o = opts ? opts->opts : re2::RE2::Options();
+    auto* w = new (std::nothrow) RE2Wrapper(pat, o);
+    if (!w) {
+        static const char kOOM[] = "re2_new_with_options: out of memory";
+        if (err_ptr) *err_ptr = kOOM;
+        if (err_len) *err_len = sizeof(kOOM) - 1;
+        return nullptr;
+    }
+    if (!w->re.ok()) {
+        if (err_ptr && err_len) {
+            const std::string& e = w->re.error();
+            *err_ptr = e.c_str();
+            *err_len = e.size();
+        }
+    } else {
+        if (err_ptr) *err_ptr = nullptr;
+        if (err_len) *err_len = 0;
+    }
+    return w;
+}
+
 
 void re2_delete(RE2Wrapper* re2) { delete re2; }
 
@@ -122,6 +178,51 @@ int re2_full_match_captures(
 int re2_group_count(const RE2Wrapper* re2) {
     if (!re2) return 0;
     return re2->re.NumberOfCapturingGroups();
+}
+
+static int copy_out(const std::string& s, char* out_buf, size_t out_len, size_t* written) {
+    if (written) *written = s.size();
+    if (!out_buf || out_len == 0) return 0;
+    if (s.size() + 1 > out_len) return 0;
+    std::memcpy(out_buf, s.data(), s.size());
+    out_buf[s.size()] = '\0';
+    return 1;
+}
+
+int re2_replace_one(const RE2Wrapper* w,
+                    const char* text, size_t text_len,
+                    const char* rewrite, size_t rewrite_len,
+                    char* out_buf, size_t out_len,
+                    size_t* written) {
+    if (!w) return 0;
+    std::string result(text, text_len);
+    std::string rew(rewrite, rewrite_len);
+    bool ok = re2::RE2::Replace(&result, w->re, rew);
+    if (!ok) return 0;
+    return copy_out(result, out_buf, out_len, written);
+}
+
+int re2_replace_all(const RE2Wrapper* w,
+                    const char* text, size_t text_len,
+                    const char* rewrite, size_t rewrite_len,
+                    char* out_buf, size_t out_len,
+                    size_t* written) {
+    if (!w) return 0;
+    std::string result(text, text_len);
+    std::string rew(rewrite, rewrite_len);
+    int n = re2::RE2::GlobalReplace(&result, w->re, rew);
+    if (n <= 0) return 0;
+    return copy_out(result, out_buf, out_len, written);
+}
+
+
+// Return 1 if this build of RE2 has ICU enabled, else 0.
+int re2_has_icu() {
+#ifdef RE2_WITH_ICU
+    return 1;
+#else
+    return 0;
+#endif
 }
 
 } // extern "C"

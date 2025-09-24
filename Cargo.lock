@@ -80,16 +80,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
-name = "eyre"
-version = "0.6.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cd915d99f24784cdc19fd37ef22b97e3ff0ae756c7e492e9fbfe897d61e2aec"
-dependencies = [
- "indenter",
- "once_cell",
-]
-
-[[package]]
 name = "find-msvc-tools"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -100,12 +90,6 @@ name = "glob"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
-
-[[package]]
-name = "indenter"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "964de6e86d545b246d84badc0fef527924ace5134f30641c203ef52ba83f58d5"
 
 [[package]]
 name = "itertools"
@@ -161,12 +145,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "once_cell"
-version = "1.21.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
-
-[[package]]
 name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -201,15 +179,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "re2-sys"
-version = "0.0.9+minimised"
+name = "re2-rs"
+version = "0.1.0"
+dependencies = [
+ "re2-rs-wrapper",
+]
+
+[[package]]
+name = "re2-rs-icu"
+version = "0.1.0"
+dependencies = [
+ "re2-rs-wrapper",
+]
+
+[[package]]
+name = "re2-rs-sys"
+version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "eyre",
  "glob",
  "libc",
  "pkg-config",
+]
+
+[[package]]
+name = "re2-rs-wrapper"
+version = "0.1.0"
+dependencies = [
+ "re2-rs-sys",
 ]
 
 [[package]]
@@ -262,6 +260,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "tests"
+version = "0.1.0"
+dependencies = [
+ "re2-rs",
+ "re2-rs-icu",
 ]
 
 [[package]]
@@ -333,3 +339,7 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "xtask"
+version = "0.1.0"

@@ -1,4 +1,4 @@
-use re2_sys::Regex;
+use re2_rs_wrapper::{Options, Regex};
 
 #[test]
 fn wrapper_partial_match() {
@@ -100,11 +100,72 @@ fn unicode_mixed_word_with_digits() {
     assert!(!re.full_match("123456")); // only digits
 }
 
+#[test]
+fn unicode_property_matching() {
+    // Match any Greek letter
+    let re = Regex::new(r"^\p{Greek}+$").unwrap();
+    assert!(re.full_match("Ωμέγα"));
+    assert!(!re.full_match("Omega")); // Latin letters should fail
+}
 
-//#[test] For ICU
-//fn unicode_case_folding_with_icu() {
-//    // Only works if RE2 was built with ICU
-//    let re = Regex::new(r"(?i)^straße$").unwrap();
-//    assert!(re.full_match("Straße"));
-//    assert!(re.full_match("STRASSE")); // ICU case folding turns ß into SS
-//}
+#[test]
+fn emoji_sequence_match() {
+    // Emoji family sequence 👩‍👩‍👧‍👦
+    let re = Regex::new(r"👩‍👩‍👧‍👦").unwrap();
+    assert!(re.partial_match("hello 👩‍👩‍👧‍👦 world"));
+    assert!(!re.full_match("👩 👩 👧 👦")); // must be grapheme cluster sequence
+}
+
+#[test]
+fn capture_groups_with_unicode() {
+    let re = Regex::new(r"^(\p{Han}+)-(\p{Hiragana}+)$").unwrap();
+    let caps = re.full_captures("漢字-ひらがな").unwrap();
+    assert_eq!(caps[1].unwrap(), "漢字");
+    assert_eq!(caps[2].unwrap(), "ひらがな");
+}
+
+#[test]
+fn bulgarian_cyrillic_script_property() {
+    // Match only Cyrillic letters (Bulgarian: "Здравей")
+    let re = Regex::new(r"^\p{Cyrillic}+$").unwrap();
+
+    assert!(re.full_match("Здравей")); // Bulgarian "Hello"
+    assert!(!re.full_match("Hello"));  // Latin should fail
+}
+
+#[test]
+fn full_captures_returns_all_groups() {
+    let re = Regex::new(r"(\w+)=(\d+)").unwrap();
+    let text = "foo=42";
+
+    let captures = re.full_captures(text).unwrap();
+    assert_eq!(re.num_captures(), 2);
+
+    // The first element in the vector is the entire match
+    assert_eq!(captures[0], Some("foo=42"));
+    // Group 1
+    assert_eq!(captures[1], Some("foo"));
+    // Group 2
+    assert_eq!(captures[2], Some("42"));
+}
+
+#[test]
+fn full_captures_handles_optional_groups() {
+    let re = Regex::new(r"(a)?(b)").unwrap();
+
+    let caps1 = re.full_captures("b").unwrap();
+    assert_eq!(caps1[0], Some("b"));      // whole match
+    assert_eq!(caps1[1], None);           // (a)? not matched
+    assert_eq!(caps1[2], Some("b"));      // (b) matched
+
+    let caps2 = re.full_captures("ab").unwrap();
+    assert_eq!(caps2[0], Some("ab"));
+    assert_eq!(caps2[1], Some("a"));
+    assert_eq!(caps2[2], Some("b"));
+}
+
+#[test]
+fn full_captures_returns_none_if_no_match() {
+    let re = Regex::new(r"(\w+)=(\d+)").unwrap();
+    assert!(re.full_captures("not a pair").is_none());
+}

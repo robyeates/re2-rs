@@ -1,31 +1,30 @@
 use std::{env, fs, path::PathBuf, process::Command};
 use std::path::Path;
 
-
+//
+// --- Build re2-rs / re2-rs-icu ---
+//
+// 1. ICU
+//    - Linked dynamically if the `icu` feature is enabled.
+//    - We do not vendor ICU source here: shipping the full tree would bloat the crate (>100 MB).
+//    - On Linux/macOS: expect ICU to be available via system packages (e.g. libicu-dev, icu-devel, or Homebrew icu4c).
+//    - On Windows: expect a prebuilt ICU release to be downloaded/unzipped and exposed via the
+//      ICU_ROOT environment variable. Example:
+//      https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip
+//
+// 2. Abseil
+//    - Required by RE2.
+//    - Lightweight, can be built directly with `cc` from vendored sources.
+//
+// 3. RE2
+//    - Core regular expression engine.
+//    - Also small enough to vendor and build directly.
+//
+// 4. re2-rs bindings
+//    - Unsafe C bindings (c-bindings.cc/h) wrapping RE2 for use in Rust.
+//    - Bindings are either generated with `bindgen` or copied from a pregenerated file.
+//
 fn main() {
-    /*
-     * --- Build re2-rs / re2-rs-icu ---
-     *
-     * 1. ICU
-     *    - Linked dynamically if the `icu` feature is enabled.
-     *    - We do not vendor ICU source here: shipping the full tree would bloat the crate (>100 MB).
-     *    - On Linux/macOS: expect ICU to be available via system packages (e.g. libicu-dev, icu-devel, or Homebrew icu4c).
-     *    - On Windows: expect a prebuilt ICU release to be downloaded/unzipped and exposed via the
-     *      ICU_ROOT environment variable. Example:
-     *      https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip
-     *
-     * 2. Abseil
-     *    - Required by RE2.
-     *    - Lightweight, can be built directly with `cc` from vendored sources.
-     *
-     * 3. RE2
-     *    - Core regular expression engine.
-     *    - Also small enough to vendor and build directly.
-     *
-     * 4. re2-rs bindings
-     *    - Unsafe C bindings (c-bindings.cc/h) wrapping RE2 for use in Rust.
-     *    - Bindings are either generated with `bindgen` or copied from a pregenerated file.
-     */
     let vendor = PathBuf::from("../vendor");
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let with_icu = cfg!(feature = "icu");
@@ -89,62 +88,40 @@ fn main() {
     println!("=== build.rs end ===");
 }
 
-fn link_icu() {
+struct IcuConfig {
+    include_paths: Vec<PathBuf>,
+    link_paths: Vec<PathBuf>,
+    libs: Vec<String>,
+}
 
-    // First try pkg-config (works on Linux, macOS with brew/pkg-config installed)
-    if pkg_config::Config::new().probe("icu-uc").is_ok() {
-        return;
+/// Probe ICU: ICU_ROOT (Windows) → pkg-config → Homebrew fallback (macOS)
+fn probe_icu() -> Option<IcuConfig> {
+    if cfg!(target_os = "windows") {
+        if let Ok(icu_root) = env::var("ICU_ROOT") {
+            return Some(IcuConfig {
+                include_paths: vec![PathBuf::from(&icu_root).join("include")],
+                link_paths: vec![PathBuf::from(&icu_root).join("lib64")],
+                libs: vec![
+                    "icuuc".into(),
+                    "icuin".into(),
+                    "icudt".into(),
+                    "icutu".into(),
+                ],
+            });
+        } else {
+            println!("cargo:warning=ICU_ROOT not set. Please download and unzip a prebuilt ICU, e.g.:");
+            println!("cargo:warning=  https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip");
+            println!("cargo:warning=Set ICU_ROOT to the extracted folder (containing include/, lib64/, bin64/).");
+            panic!("ICU_ROOT not set; cannot build with ICU on Windows");
+        }
     }
 
-    if cfg!(target_os = "windows") {
-        let icu_root = match env::var("ICU_ROOT") {
-            Ok(path) => path,
-            Err(_) => {
-                println!("cargo:warning=ICU_ROOT not set. Please download and unzip a prebuilt ICU, e.g.:");
-                println!("cargo:warning=  https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip");
-                println!("cargo:warning=Set ICU_ROOT to the extracted folder (containing include/, lib64/, bin64/).");
-                panic!("ICU_ROOT not set; cannot build with ICU on Windows");
-            }
-        };
-
-        let include = PathBuf::from(&icu_root).join("include");
-        let lib = PathBuf::from(&icu_root).join("lib64");
-        let bin = PathBuf::from(&icu_root).join("bin64");
-
-        println!("cargo:include={}", include.display());
-        println!("cargo:rustc-link-search=native={}", lib.display());
-
-        // Dynamic linking to ICU DLLs
-        println!("cargo:rustc-link-lib=dylib=icuuc");
-        println!("cargo:rustc-link-lib=dylib=icuin");
-        println!("cargo:rustc-link-lib=dylib=icudt");
-
-        //dev convenience - makes running local tests more straigjhtf
-        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-        println!("cargo:warning=OUT_DIR = {}", out_dir.display());
-
-        // ../../../ back to target/
-        let target_dir = out_dir.ancestors().nth(3).unwrap();
-        println!("cargo:warning=target_dir = {}", target_dir.display());
-
-        let deps_dir = target_dir.join("deps");
-        println!("cargo:warning=deps_dir = {}", deps_dir.display());
-
-        for dll in ["icuuc77.dll", "icuin77.dll", "icudt77.dll", "icutu77.dll"] {
-            let src = bin.join(dll);
-            let dst = deps_dir.join(dll);
-
-            println!("cargo:warning=Looking for DLL: {}", src.display());
-            println!("cargo:warning=Copying to   : {}", dst.display());
-
-            if let Err(e) = std::fs::copy(&src, &dst) {
-                println!("cargo:warning=Could not copy {}: {}", dll, e);
-            } else {
-                println!("cargo:warning=Copied {}", dll);
-            }
-        }
-
-        return;
+    if let Ok(lib) = pkg_config::Config::new().probe("icu-i18n") {
+        return Some(IcuConfig {
+            include_paths: lib.include_paths,
+            link_paths: lib.link_paths,
+            libs: lib.libs,
+        });
     }
 
     if cfg!(target_os = "macos") {
@@ -159,17 +136,51 @@ fn link_icu() {
             .to_string();
 
         if !brew_prefix.is_empty() {
-            let include = format!("{}/include", brew_prefix);
-            let lib = format!("{}/lib", brew_prefix);
-
-            println!("cargo:include={}", include);
-            println!("cargo:rustc-link-search=native={}", lib);
-            println!("cargo:rustc-link-lib=dylib=icuuc");
-            println!("cargo:rustc-link-lib=dylib=icui18n");
-            return;
+            return Some(IcuConfig {
+                include_paths: vec![PathBuf::from(format!("{}/include", brew_prefix))],
+                link_paths: vec![PathBuf::from(format!("{}/lib", brew_prefix))],
+                libs: vec!["icui18n".into(), "icuuc".into(), "icudata".into()],
+            });
         }
+    }
 
-        panic!("Could not find ICU via pkg-config or Homebrew. Please install icu4c.");
+    None
+}
+
+fn link_icu() {
+
+    let cfg = probe_icu().unwrap_or_else(|| {
+        println!("cargo:warning=ICU not found. Set ICU_ROOT (Windows) or install via pkg-config/Homebrew.");
+        panic!("ICU not found; cannot build with feature `icu`");
+    });
+
+    for path in &cfg.include_paths {
+        println!("cargo:include={}", path.display());
+    }
+    for lib_path in &cfg.link_paths {
+        println!("cargo:rustc-link-search=native={}", lib_path.display());
+    }
+    for lib in &cfg.libs {
+        println!("cargo:rustc-link-lib={}", lib);
+    }
+
+    // Windows-only: copy DLLs into target dir for test runs
+    if cfg!(target_os = "windows") {
+        let icu_root = env::var("ICU_ROOT").unwrap();
+        let bin = PathBuf::from(&icu_root).join("bin64");
+
+        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+        let target_dir = out_dir.ancestors().nth(3).unwrap();
+        let deps_dir = target_dir.join("deps");
+
+        for dll in ["icuuc77.dll", "icuin77.dll", "icudt77.dll", "icutu77.dll"] {
+            let src = bin.join(dll);
+            let dst = deps_dir.join(dll);
+
+            if let Err(e) = std::fs::copy(&src, &dst) {
+                println!("cargo:warning=Could not copy {}: {}", dll, e);
+            }
+        }
     }
 }
 
@@ -267,14 +278,16 @@ fn build_re2(vendor: PathBuf, with_icu: bool) {
     re2.include(vendor.join("abseil-cpp"));
 
     if with_icu {
-        if let Ok(icu_root) = env::var("ICU_ROOT") {
-            re2.include(PathBuf::from(icu_root).join("include"));
+        if let Some(cfg) = probe_icu() {
+            for inc in &cfg.include_paths {
+                re2.include(inc);
+                println!("cargo:warning=Using ICU include path {}", inc.display());
+            }
         }
     }
 
     let compiler = re2.get_compiler();
     let is_msvc = compiler.is_like_msvc();
-
     add_common_defines(&mut re2, is_msvc, with_icu);
 
     for entry in glob::glob("../vendor/re2/*.cc").unwrap() {

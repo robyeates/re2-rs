@@ -49,8 +49,17 @@ jobs:
             sudo apt-get update && sudo apt-get install -y libicu-dev pkg-config
           else
             brew install icu4c pkg-config
-            echo "PKG_CONFIG_PATH=$(brew --prefix icu4c)/lib/pkgconfig" >> $GITHUB_ENV
-            echo "Using PKG_CONFIG_PATH=$(brew --prefix icu4c)/lib/pkgconfig"
+            export PKG_CONFIG_PATH="$(brew --prefix icu4c)/lib/pkgconfig"
+            echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+            echo "--- Debug: ICU pkgconfig directory ---"
+            ls -l "$PKG_CONFIG_PATH"
+
+            echo "--- Debug: pkg-config path ---"
+            which pkg-config
+            pkg-config --version
+
+            echo "--- pkg-config icu-i18n ---"
             pkg-config --cflags icu-i18n || true
             pkg-config --libs icu-i18n || true
           fi

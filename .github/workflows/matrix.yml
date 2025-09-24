@@ -26,6 +26,8 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install llvm-tools
+        run: rustup component add llvm-tools-preview
 
       - name: Install grcov
         run: cargo install grcov --locked
@@ -33,10 +35,11 @@ jobs:
       # ICU setup only for Windows when matrix.icu == true
       - name: Setup ICU (Windows)
         if: matrix.os == 'windows-latest' && matrix.icu == 'true'
+        shell: pwsh
         run: |
-          curl -LO https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip
-          unzip icu4c-77_1-Win64-MSVC2022.zip -d $HOME/icu
-          echo "ICU_ROOT=$HOME/icu" >> $GITHUB_ENV
+          ccurl -LO https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip
+          Expand-Archive icu4c-77_1-Win64-MSVC2022.zip -DestinationPath $env:USERPROFILE\icu
+          echo "ICU_ROOT=$env:USERPROFILE\icu" >> $env:GITHUB_ENV
 
       # ICU install for Linux/macOS when matrix.icu == true
       - name: Setup ICU (Linux/macOS)

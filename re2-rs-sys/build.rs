@@ -154,13 +154,8 @@ fn link_icu() {
         panic!("ICU not found; cannot build with feature `icu`");
     });
 
-    // Guarantee essential libs for RE2+ICU
-    let required = ["icui18n", "icuuc", "icudata"];
-    for r in required {
-        if !cfg.libs.iter().any(|l| l == r) {
-            cfg.libs.push(r.to_string());
-        }
-    }
+    // Attempt to Guarantee essential libs for RE2+ICU - dif names across platforms
+    ensure_icu_libs(&mut cfg);
 
     for path in &cfg.include_paths {
         println!("cargo:include={}", path.display());
@@ -329,5 +324,21 @@ fn add_common_defines(build: &mut cc::Build, is_msvc: bool, with_icu: bool) {
     if with_icu {
         build.define("RE2_WITH_ICU", None);
         build.define("RE2_USE_ICU", Some("1"));
+    }
+}
+
+fn ensure_icu_libs(cfg: &mut IcuConfig) {
+    let required: &[&str] = if cfg!(target_os = "windows") {
+        // ICU lib names for MSVC builds
+        &["icuin", "icuuc", "icudt", "icutu"]
+    } else {
+        // ICU lib names for Unix-like builds
+        &["icui18n", "icuuc", "icudata"]
+    };
+
+    for r in required {
+        if !cfg.libs.iter().any(|l| l == r) {
+            cfg.libs.push(r.to_string());
+        }
     }
 }

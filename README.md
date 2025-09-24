@@ -7,20 +7,21 @@
 *** 
 <p align="center">
   <a href="https://crates.io/crates/my_crate">
-    <img src="https://img.shields.io/crates/v/my_crate.svg" alt="Crates.io">
+    <img src="404https://img.shields.io/crates/v/my_crate.svg" alt="Crates.io">
   </a>
   <a href="https://docs.rs/my_crate">
-    <img src="https://docs.rs/my_crate/badge.svg" alt="Docs.rs">
+    <img src="404https://docs.rs/my_crate/badge.svg" alt="Docs.rs">
   </a>
   <a href="https://github.com/user/my_crate/actions">
-    <img src="https://github.com/user/my_crate/actions/workflows/ci.yml/badge.svg" alt="Build Status">
+    <img src="https://github.com/robyeates/re2-rs/actions/workflows/matrix.yml/badge.svg?branch=main" alt="Build Status">
   </a>
+<a href="https://codecov.io/github/robyeates/re2-rs" > 
+ <img src="https://codecov.io/github/robyeates/re2-rs/graph/badge.svg?token=UMEQPPCZBY"/> 
+ </a>
   <a href="#license">
     <img src="https://img.shields.io/crates/l/my_crate" alt="License">
   </a>
 </p>
-
-***
 
 This project began as a fork to work around hard dependencies in the existing ecosystem,  
 but has since grown into a fully standalone set of crates.

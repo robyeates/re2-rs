@@ -149,10 +149,18 @@ fn probe_icu() -> Option<IcuConfig> {
 
 fn link_icu() {
 
-    let cfg = probe_icu().unwrap_or_else(|| {
+    let mut cfg = probe_icu().unwrap_or_else(|| {
         println!("cargo:warning=ICU not found. Set ICU_ROOT (Windows) or install via pkg-config/Homebrew.");
         panic!("ICU not found; cannot build with feature `icu`");
     });
+
+    // Guarantee essential libs for RE2+ICU
+    let required = ["icui18n", "icuuc", "icudata"];
+    for r in required {
+        if !cfg.libs.iter().any(|l| l == r) {
+            cfg.libs.push(r.to_string());
+        }
+    }
 
     for path in &cfg.include_paths {
         println!("cargo:include={}", path.display());
@@ -166,20 +174,24 @@ fn link_icu() {
 
     // Windows-only: copy DLLs into target dir for test runs
     if cfg!(target_os = "windows") {
-        let icu_root = env::var("ICU_ROOT").unwrap();
-        let bin = PathBuf::from(&icu_root).join("bin64");
+        copy_icu_dlls_for_local_test();
+    }
+}
 
-        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-        let target_dir = out_dir.ancestors().nth(3).unwrap();
-        let deps_dir = target_dir.join("deps");
+fn copy_icu_dlls_for_local_test() {
+    let icu_root = env::var("ICU_ROOT").unwrap();
+    let bin = PathBuf::from(&icu_root).join("bin64");
 
-        for dll in ["icuuc77.dll", "icuin77.dll", "icudt77.dll", "icutu77.dll"] {
-            let src = bin.join(dll);
-            let dst = deps_dir.join(dll);
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let target_dir = out_dir.ancestors().nth(3).unwrap();
+    let deps_dir = target_dir.join("deps");
 
-            if let Err(e) = std::fs::copy(&src, &dst) {
-                println!("cargo:warning=Could not copy {}: {}", dll, e);
-            }
+    for dll in ["icuuc77.dll", "icuin77.dll", "icudt77.dll", "icutu77.dll"] {
+        let src = bin.join(dll);
+        let dst = deps_dir.join(dll);
+
+        if let Err(e) = std::fs::copy(&src, &dst) {
+            println!("cargo:warning=Could not copy {}: {}", dll, e);
         }
     }
 }

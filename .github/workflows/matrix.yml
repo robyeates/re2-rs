@@ -50,6 +50,9 @@ jobs:
           else
             brew install icu4c pkg-config
             echo "PKG_CONFIG_PATH=$(brew --prefix icu4c)/lib/pkgconfig" >> $GITHUB_ENV
+            echo "Using PKG_CONFIG_PATH=$(brew --prefix icu4c)/lib/pkgconfig"
+            pkg-config --cflags icu-i18n || true
+            pkg-config --libs icu-i18n || true
           fi
 
       - name: Build (no ICU)

@@ -37,7 +37,7 @@ jobs:
         if: matrix.os == 'windows-latest' && matrix.icu == 'true'
         shell: pwsh
         run: |
-          ccurl -LO https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip
+          curl -LO https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-Win64-MSVC2022.zip
           Expand-Archive icu4c-77_1-Win64-MSVC2022.zip -DestinationPath $env:USERPROFILE\icu
           echo "ICU_ROOT=$env:USERPROFILE\icu" >> $env:GITHUB_ENV
 
@@ -49,6 +49,7 @@ jobs:
             sudo apt-get update && sudo apt-get install -y libicu-dev pkg-config
           else
             brew install icu4c pkg-config
+            echo "PKG_CONFIG_PATH=$(brew --prefix icu4c)/lib/pkgconfig" >> $GITHUB_ENV
           fi
 
       - name: Build (no ICU)

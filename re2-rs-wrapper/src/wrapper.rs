@@ -1,6 +1,11 @@
 use re2_rs_sys::*;
 use std::{ffi::c_char, ptr, slice, str};
 
+/*
+Overall goal is to minimise allocation - this will be used on the hot-path and we want to avoid heap churn!
+ */
+
+
 /// Raw pointer type alias for readability
 pub type RE2WrapperHandle = *mut RE2Wrapper;
 pub type OptionsHandle = *mut RE2Options;
@@ -162,6 +167,80 @@ pub fn replace(raw: RE2WrapperHandle, text: &str, rewrite: &str, one: bool) -> O
     } else {
         None
     }
+}
+
+pub struct FindIter<'t> {
+    raw: *mut RE2Iter,
+    text: &'t str,
+}
+
+impl<'r, 't> Iterator for FindIter<'t> {
+    type Item = &'t str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut span = re2_span_t { start: 0, len: 0 };
+        let ok = unsafe { re2_iter_next(self.raw, &mut span) };
+        if ok == 0 {
+            None
+        } else {
+            Some(&self.text[span.start..span.start + span.len])
+        }
+    }
+}
+
+impl<'r, 't> Drop for FindIter<'t> {
+    fn drop(&mut self) {
+        unsafe { re2_iter_delete(self.raw) };
+    }
+}
+
+pub struct CapturesIter<'t> {
+    raw:  *mut RE2Iter,
+    text: &'t str,
+    n: usize,
+}
+
+impl<'t> Iterator for CapturesIter<'t> {
+    type Item = Vec<Option<&'t str>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut spans = vec![re2_span_t { start: 0, len: 0 }; self.n];
+        let mut written: usize = 0;
+        let ok = unsafe {
+            re2_iter_next_captures(self.raw, spans.as_mut_ptr(), spans.len(), &mut written)
+        };
+        if ok == 0 {
+            None
+        } else {
+            let mut caps = Vec::with_capacity(written);
+            for s in &spans[..written] {
+                if s.len == 0 {
+                    caps.push(None);
+                } else {
+                    caps.push(Some(&self.text[s.start..s.start + s.len]));
+                }
+            }
+            Some(caps)
+        }
+    }
+}
+
+impl<'t> Drop for CapturesIter<'t> {
+    fn drop(&mut self) {
+        unsafe { re2_iter_delete(self.raw) };
+    }
+}
+
+
+pub fn find_iter(raw: RE2WrapperHandle, text: &str) -> FindIter<'_> {
+    let raw = unsafe { re2_iter_new(raw, text.as_ptr() as _, text.len()) };
+    FindIter { raw, text }
+}
+
+pub fn captures_iter(raw: RE2WrapperHandle, text: &str) -> CapturesIter<'_> {
+    let n = group_count(raw);
+    let raw = unsafe { re2_iter_new(raw, text.as_ptr() as _, text.len()) };
+    CapturesIter { raw, text, n }
 }
 
 pub fn has_icu() -> bool {

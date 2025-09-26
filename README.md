@@ -4,13 +4,13 @@
 <h1 align="center">re2-rs</h1>
 <p align="center">🔍 (Will be) Fast, safe, and ergonomic Rust bindings for RE2 with ICU 🧩</p>
 
-*** 
+
 <p align="center">
   <a href="https://crates.io/crates/my_crate">
-    <img src="404https://img.shields.io/crates/v/my_crate.svg" alt="Crates.io">
+    <img alt="Crates.io Version" src="https://img.shields.io/crates/v/re2-rs">
   </a>
   <a href="https://docs.rs/my_crate">
-    <img src="404https://docs.rs/my_crate/badge.svg" alt="Docs.rs">
+    <img alt="docs.rs" src="https://img.shields.io/docsrs/re2-rs">
   </a>
   <a href="https://github.com/user/my_crate/actions">
     <img src="https://github.com/robyeates/re2-rs/actions/workflows/matrix.yml/badge.svg?branch=main" alt="Build Status">
@@ -23,11 +23,13 @@
   </a>
 </p>
 
-This project began as a fork to work around hard dependencies in the existing ecosystem,  
-but has since grown into a fully standalone set of crates.
+*** 
+Unpublished - in Development!
+*** 
 
-Dependencies are vendored directly to ensure reproducible builds and to keep `re2-rs` minimal.  
-The goal is to provide a **small, dependency-free baseline (`re2-rs`)** with the essential RE2  
+This project began as a fork to work around hard dependencies in the existing ecosystem, but has since grown into a fully standalone set of crates.
+
+Dependencies are vendored directly to ensure reproducible builds and to keep `re2-rs` minimal. The goal is to provide a **small, dependency-free baseline (`re2-rs`)** with the essential RE2  
 features, and a **superset (`re2-rs-icu`)** that exposes ICU’s extended Unicode functionality.
 
 Vendored versions are pinned to exact upstream releases:
@@ -37,7 +39,7 @@ Vendored versions are pinned to exact upstream releases:
 - **ICU**: release-77-1
 
 ### RE2 Rust Bindings: ICU vs Non-ICU
- Feature                          | `re2-rs` (no ICU) | `re2-rs-icu` (with ICU) |
+| Feature                          | `re2-rs` (no ICU) | `re2-rs-icu` (with ICU) |
 |----------------------------------|-------------------|--------------------------|
 | ASCII matching (`\d`, `\w`, `\b`) | ✅ Supported       | ✅ Supported              |
 | Unicode digit matching (`\d`)     | ❌ ASCII only      | ✅ All `Nd` digits (e.g. ٣٤٥) |

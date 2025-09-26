@@ -169,3 +169,45 @@ fn full_captures_returns_none_if_no_match() {
     let re = Regex::new(r"(\w+)=(\d+)").unwrap();
     assert!(re.full_captures("not a pair").is_none());
 }
+
+#[test]
+fn wrapper_replace_one_and_all() {
+    let re = Regex::new(r"\d+").unwrap();
+
+    assert_eq!(
+        re.replace_one("a1b22c333", "X").unwrap(),
+        "aXb22c333"
+    );
+
+    assert_eq!(
+        re.replace_all("a1b22c333", "X").unwrap(),
+        "aXbXcX"
+    );
+}
+
+#[test]
+fn wrapper_find_iter_collects_matches() {
+    let re = Regex::new(r"\d+").unwrap();
+    let matches: Vec<_> = re.find_iter("a1b22c333").collect();
+    assert_eq!(matches, vec!["1", "22", "333"]);
+}
+
+#[test]
+fn wrapper_captures_iter_collects_groups() {
+    let re = Regex::new(r"(a)(\\d+)").unwrap();
+    let caps: Vec<_> = re.captures_iter("a1a22").collect();
+
+    assert_eq!(
+        caps,
+        vec![
+            vec![Some("a"), Some("1")],
+            vec![Some("a"), Some("22")]
+        ]
+    );
+}
+
+#[test]
+fn wrapper_num_captures_reports_correct_count() {
+    let re = Regex::new(r"(foo)(bar)?").unwrap();
+    assert_eq!(re.num_captures(), 2);
+}

@@ -29,8 +29,8 @@ Unpublished - in Development!
 
 This project began as a fork to work around hard dependencies in the existing ecosystem, but has since grown into a fully standalone set of crates.
 
-Dependencies are vendored directly to ensure reproducible builds and to keep `re2-rs` minimal. The goal is to provide a **small, dependency-free baseline (`re2-rs`)** with the essential RE2  
-features, and a **superset (`re2-rs-icu`)** that exposes ICU’s extended Unicode functionality.
+Dependencies are vendored directly to ensure reproducible builds and to keep `re2-rs` minimal. The goal is to provide a **small, 
+dependency-free baseline (`re2-rs`)** with the essential RE2 features, and a **superset (`re2-rs-icu`)** that exposes ICU’s extended Unicode functionality.
 
 Vendored versions are pinned to exact upstream releases:
 
@@ -116,27 +116,27 @@ Then build:
 
 `cargo build -p re2-rs-icu --features icu`
 
-The build will link against `ICU_ROOT\include` and `ICU_ROOT\lib64`, and attempt to copy
-the required DLLs into Cargo’s target\...\deps directory so tests can run.
+The build will link against `ICU_ROOT\include` and `ICU_ROOT\lib64`, and attempt to copy the required DLLs
+into Cargo’s `target\...\deps` directory so tests can run.
 
 Expected DLLs (for ICU 77.1):
 
-* icuuc77.dll
-* icuin77.dll
-* icudt77.dll
-* icutu77.dll
+* `icuuc77.dll`
+* `icuin77.dll`
+* `icudt77.dll`
+* `icutu77.dll`
 
-⚠️ Note: Windows builds are currently aimed at development and testing only.
-If the DLLs are not found or not copied, you may see STATUS_DLL_NOT_FOUND when running tests.
+⚠️ Note: Windows builds are currently aimed at development and testing only. If the DLLs are not found or
+not copied, you may see STATUS_DLL_NOT_FOUND when running tests.
 Static linking of ICU is not supported at this time.
 
-Linux / macOS
+#### Linux / macOS
 
 On Unix platforms, ICU is discovered via pkg-config.
-Install the system ICU development libraries (e.g. libicu-dev on Debian/Ubuntu, icu on Fedora, icu4c on macOS/Homebrew), then build as usual:
+Install the system ICU development libraries (e.g. `libicu-dev` on Debian/Ubuntu, `icu` on Fedora,
+`icu4c` on macOS/Homebrew), then build as usual:
 
-cargo build -p re2-rs-icu --features icu
-
+`cargo build -p re2-rs-icu --features icu`
 
 ℹ️ The build script first checks ICU_ROOT (Windows).
 If unset, it falls back to pkg-config (Linux/macOS).
@@ -144,7 +144,7 @@ If unset, it falls back to pkg-config (Linux/macOS).
 ## TODO
 * Dedupe tests
 * Docs, link the (corrected) feature table to test line number
-* Github action to matrix build it - without and without bindgen
+* ~~Github action to matrix build it - without and without bindgen~~
 * Add full `Anchor` support - `longest_match` currently doesn't pass through the shim
 * Improve error handling - [spack-rs](https://github.com/cosmicexplorer/spack-rs/blob/main/re2/src/error.rs) has a full shim
 * Other features as required

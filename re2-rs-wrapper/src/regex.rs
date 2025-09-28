@@ -163,7 +163,7 @@ impl Regex {
     /// let matches: Vec<_> = re.find_iter("a1b22c333").collect();
     /// assert_eq!(matches, vec!["1", "22", "333"]);
     /// ```
-    pub fn find_iter<'t>(&self, text: &'t str) -> FindIter<'t> {
+    pub fn find_iter<'r, 't>(&'r self, text: &'t str) -> FindIter<'r, 't> {
         wrapper::find_iter(self.raw, text)
     }
 
@@ -172,7 +172,7 @@ impl Regex {
     /// # Examples
     /// ```
     /// use re2_rs::Regex;
-    /// let re = Regex::new(r"(a)(\\d+)").unwrap();
+    /// let re = Regex::new(r"(a)(\d+)").unwrap();
     /// let caps: Vec<_> = re.captures_iter("a1a22").collect();
     /// assert_eq!(
     ///     caps,
@@ -182,8 +182,13 @@ impl Regex {
     ///     ]
     /// );
     /// ```
-    pub fn captures_iter<'t>(&self, text: &'t str) -> CapturesIter<'t> {
+    pub fn captures_iter<'r, 't>(&'r self, text: &'t str) -> CapturesIter<'r, 't> {
         wrapper::captures_iter(self.raw, text)
     }
 }
 
+impl Drop for Regex {
+    fn drop(&mut self) {
+        wrapper::delete_regex(self.raw);
+    }
+}

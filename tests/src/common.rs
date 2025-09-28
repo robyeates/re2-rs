@@ -194,7 +194,7 @@ fn wrapper_find_iter_collects_matches() {
 
 #[test]
 fn wrapper_captures_iter_collects_groups() {
-    let re = Regex::new(r"(a)(\\d+)").unwrap();
+    let re = Regex::new(r"(a)(\d+)").unwrap();
     let caps: Vec<_> = re.captures_iter("a1a22").collect();
 
     assert_eq!(

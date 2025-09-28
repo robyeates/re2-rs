@@ -169,78 +169,100 @@ pub fn replace(raw: RE2WrapperHandle, text: &str, rewrite: &str, one: bool) -> O
     }
 }
 
-pub struct FindIter<'t> {
+pub struct FindIter<'r, 't> {
     raw: *mut RE2Iter,
     text: &'t str,
+    keep_parent_alive: core::marker::PhantomData<&'r crate::Regex>,
 }
 
-impl<'r, 't> Iterator for FindIter<'t> {
+impl<'r, 't> Iterator for FindIter<'r, 't> {
     type Item = &'t str;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut span = re2_span_t { start: 0, len: 0 };
-        let ok = unsafe { re2_iter_next(self.raw, &mut span) };
-        if ok == 0 {
-            None
-        } else {
-            Some(&self.text[span.start..span.start + span.len])
+        let ok = unsafe { re2_iter_next(self.raw, &mut span) } != 0;
+        if !ok {
+            return None;
         }
+        Some(&self.text[span.start..span.start + span.len])
     }
 }
 
-impl<'r, 't> Drop for FindIter<'t> {
-    fn drop(&mut self) {
-        unsafe { re2_iter_delete(self.raw) };
+pub fn find_iter<'r, 't>(raw: RE2WrapperHandle, text: &'t str) -> FindIter<'r, 't> {
+    let raw_iter = unsafe { re2_iter_new(raw, text.as_ptr() as _, text.len()) };
+    FindIter {
+        raw: raw_iter,
+        text,
+        keep_parent_alive: core::marker::PhantomData,
     }
 }
 
-pub struct CapturesIter<'t> {
-    raw:  *mut RE2Iter,
+pub struct CapturesIter<'r, 't> {
+    raw: *mut RE2Iter,
     text: &'t str,
-    n: usize,
+    group_count: usize,
+    regex: RE2WrapperHandle, // keep the parent regex handle
+    keep_parent_alive: core::marker::PhantomData<&'r crate::Regex>,
 }
 
-impl<'t> Iterator for CapturesIter<'t> {
+impl<'r, 't> Iterator for CapturesIter<'r, 't> {
     type Item = Vec<Option<&'t str>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut spans = vec![re2_span_t { start: 0, len: 0 }; self.n];
+        let mut spans: Vec<re2_span_t> = vec![re2_span_t { start: 0, len: 0 }; self.group_count];
         let mut written: usize = 0;
+
         let ok = unsafe {
-            re2_iter_next_captures(self.raw, spans.as_mut_ptr(), spans.len(), &mut written)
-        };
-        if ok == 0 {
-            None
-        } else {
-            let mut caps = Vec::with_capacity(written);
-            for s in &spans[..written] {
-                if s.len == 0 {
-                    caps.push(None);
-                } else {
-                    caps.push(Some(&self.text[s.start..s.start + s.len]));
-                }
-            }
-            Some(caps)
+            re2_iter_next_captures(
+                self.raw,
+                spans.as_mut_ptr(),
+                spans.len(),
+                &mut written,
+            )
+        } != 0;
+        if !ok {
+            return None;
         }
+
+        let mut out = Vec::with_capacity(written);
+        for span in spans.into_iter().take(written) {
+            if span.len == 0 && span.start == 0 {
+                // convention: no capture → None
+                out.push(None);
+            } else {
+                let s = &self.text[span.start..span.start + span.len];
+                out.push(Some(s));
+            }
+        }
+        Some(out)
     }
 }
 
-impl<'t> Drop for CapturesIter<'t> {
+pub fn captures_iter<'r, 't>(
+    raw: RE2WrapperHandle,
+    text: &'t str,
+) -> CapturesIter<'r, 't> {
+    let raw_iter = unsafe { re2_iter_new(raw, text.as_ptr() as _, text.len()) };
+    let group_count = unsafe { group_count(raw) } + 1;
+    CapturesIter {
+        raw: raw_iter,
+        regex: raw,
+        text,
+        group_count,
+        keep_parent_alive: core::marker::PhantomData,
+    }
+}
+
+impl<'r, 't> Drop for FindIter<'r, 't> {
     fn drop(&mut self) {
-        unsafe { re2_iter_delete(self.raw) };
+        unsafe { re2_iter_delete(self.raw) }
     }
 }
 
-
-pub fn find_iter(raw: RE2WrapperHandle, text: &str) -> FindIter<'_> {
-    let raw = unsafe { re2_iter_new(raw, text.as_ptr() as _, text.len()) };
-    FindIter { raw, text }
-}
-
-pub fn captures_iter(raw: RE2WrapperHandle, text: &str) -> CapturesIter<'_> {
-    let n = group_count(raw);
-    let raw = unsafe { re2_iter_new(raw, text.as_ptr() as _, text.len()) };
-    CapturesIter { raw, text, n }
+impl<'r, 't> Drop for CapturesIter<'r, 't> {
+    fn drop(&mut self) {
+        unsafe { re2_iter_delete(self.raw) }
+    }
 }
 
 pub fn has_icu() -> bool {

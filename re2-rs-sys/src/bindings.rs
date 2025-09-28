@@ -35,7 +35,7 @@ unsafe extern "C" {
     pub fn re2_options_new() -> *mut RE2Options;
 }
 unsafe extern "C" {
-    pub fn re2_options_delete(o: *mut RE2Options);
+    pub fn re2_options_delete(arg1: *mut RE2Options);
 }
 unsafe extern "C" {
     pub fn re2_options_set_case_sensitive(o: *mut RE2Options, sensitive: ::std::os::raw::c_int);
@@ -134,6 +134,32 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn re2_group_count(re2: *const RE2Wrapper) -> ::std::os::raw::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct RE2Iter {
+    _unused: [u8; 0],
+}
+unsafe extern "C" {
+    pub fn re2_iter_new(
+        re2: *const RE2Wrapper,
+        text: *const ::std::os::raw::c_char,
+        len: usize,
+    ) -> *mut RE2Iter;
+}
+unsafe extern "C" {
+    pub fn re2_iter_next(it: *mut RE2Iter, out_span: *mut re2_span_t) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn re2_iter_next_captures(
+        it: *mut RE2Iter,
+        out_spans: *mut re2_span_t,
+        out_spans_len: usize,
+        written: *mut usize,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn re2_iter_delete(it: *mut RE2Iter);
 }
 unsafe extern "C" {
     pub fn re2_has_icu() -> ::std::os::raw::c_int;

@@ -1,6 +1,11 @@
 use re2_rs_sys::*;
 use std::{ffi::c_char, ptr, slice, str};
 
+/*
+Overall goal is to minimise allocation - this will be used on the hot-path and we want to avoid heap churn!
+ */
+
+
 /// Raw pointer type alias for readability
 pub type RE2WrapperHandle = *mut RE2Wrapper;
 pub type OptionsHandle = *mut RE2Options;
@@ -161,6 +166,102 @@ pub fn replace(raw: RE2WrapperHandle, text: &str, rewrite: &str, one: bool) -> O
         Some(String::from_utf8_lossy(&buf[..written]).into_owned())
     } else {
         None
+    }
+}
+
+pub struct FindIter<'r, 't> {
+    raw: *mut RE2Iter,
+    text: &'t str,
+    keep_parent_alive: core::marker::PhantomData<&'r crate::Regex>,
+}
+
+impl<'r, 't> Iterator for FindIter<'r, 't> {
+    type Item = &'t str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut span = re2_span_t { start: 0, len: 0 };
+        let ok = unsafe { re2_iter_next(self.raw, &mut span) } != 0;
+        if !ok {
+            return None;
+        }
+        Some(&self.text[span.start..span.start + span.len])
+    }
+}
+
+pub fn find_iter<'r, 't>(raw: RE2WrapperHandle, text: &'t str) -> FindIter<'r, 't> {
+    let raw_iter = unsafe { re2_iter_new(raw, text.as_ptr() as _, text.len()) };
+    FindIter {
+        raw: raw_iter,
+        text,
+        keep_parent_alive: core::marker::PhantomData,
+    }
+}
+
+pub struct CapturesIter<'r, 't> {
+    raw: *mut RE2Iter,
+    text: &'t str,
+    group_count: usize,
+    regex: RE2WrapperHandle, // keep the parent regex handle
+    keep_parent_alive: core::marker::PhantomData<&'r crate::Regex>,
+}
+
+impl<'r, 't> Iterator for CapturesIter<'r, 't> {
+    type Item = Vec<Option<&'t str>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut spans: Vec<re2_span_t> = vec![re2_span_t { start: 0, len: 0 }; self.group_count];
+        let mut written: usize = 0;
+
+        let ok = unsafe {
+            re2_iter_next_captures(
+                self.raw,
+                spans.as_mut_ptr(),
+                spans.len(),
+                &mut written,
+            )
+        } != 0;
+        if !ok {
+            return None;
+        }
+
+        let mut out = Vec::with_capacity(written);
+        for span in spans.into_iter().take(written) {
+            if span.len == 0 && span.start == 0 {
+                // convention: no capture → None
+                out.push(None);
+            } else {
+                let s = &self.text[span.start..span.start + span.len];
+                out.push(Some(s));
+            }
+        }
+        Some(out)
+    }
+}
+
+pub fn captures_iter<'r, 't>(
+    raw: RE2WrapperHandle,
+    text: &'t str,
+) -> CapturesIter<'r, 't> {
+    let raw_iter = unsafe { re2_iter_new(raw, text.as_ptr() as _, text.len()) };
+    let group_count = unsafe { group_count(raw) } + 1;
+    CapturesIter {
+        raw: raw_iter,
+        regex: raw,
+        text,
+        group_count,
+        keep_parent_alive: core::marker::PhantomData,
+    }
+}
+
+impl<'r, 't> Drop for FindIter<'r, 't> {
+    fn drop(&mut self) {
+        unsafe { re2_iter_delete(self.raw) }
+    }
+}
+
+impl<'r, 't> Drop for CapturesIter<'r, 't> {
+    fn drop(&mut self) {
+        unsafe { re2_iter_delete(self.raw) }
     }
 }
 

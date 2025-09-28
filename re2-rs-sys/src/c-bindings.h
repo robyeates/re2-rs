@@ -78,6 +78,25 @@ int re2_full_match_captures(
 
 int re2_group_count(const RE2Wrapper* re2);
 
+//Regex::captures (anchored full match only) vs. captures_iter (streaming unanchored matches)
+// Iterator over matches of a compiled RE2 on a given input.
+typedef struct RE2Iter RE2Iter;
+
+RE2Iter* re2_iter_new(const RE2Wrapper* re2, const char* text, size_t len);
+
+// Single-match iterator (whole match only). Returns 1 if a match was produced, 0 when done.
+int re2_iter_next(RE2Iter* it, re2_span_t* out_span);
+
+// Capturing iterator. Fills up to out_spans_len spans (0..=n groups). `*written` is set to
+// the number of spans written. Returns 1 if a match was produced, 0 when done.
+int re2_iter_next_captures(RE2Iter* it,
+                           re2_span_t* out_spans,
+                           size_t out_spans_len,
+                           size_t* written);
+
+void re2_iter_delete(RE2Iter* it);
+
+
 // Return 1 if this build of RE2 has ICU enabled, else 0.
 int re2_has_icu();
 

@@ -215,6 +215,85 @@ int re2_replace_all(const RE2Wrapper* w,
     return copy_out(result, out_buf, out_len, written);
 }
 
+#include <vector>
+#include "re2/re2.h"
+
+// One iterator instance per (regex, text). Reused buffers to avoid allocs in next().
+struct RE2Iter {
+    const RE2Wrapper* re;        // not owned
+    std::string       text;      // owned copy so StringPieces stay valid
+    re2::StringPiece  input;     // moving window over text
+
+    // Reused per-step buffers for captures:
+    std::vector<re2::StringPiece>      groups;      // [0] = whole match, then capture groups
+    std::vector<re2::RE2::Arg>         arg_storage; // Arg objects, each points at groups[i]
+    std::vector<const re2::RE2::Arg*>  args;        // Arg* array passed to FindAndConsumeN
+};
+
+extern "C" RE2Iter* re2_iter_new(const RE2Wrapper* re2, const char* text, size_t len) {
+    auto* it = new RE2Iter;
+    it->re = re2;
+    it->text.assign(text, len);
+    it->input = re2::StringPiece(it->text);
+
+    // Prepare capture buffers once.
+    const size_t n = static_cast<size_t>(it->re->re.NumberOfCapturingGroups()) + 1; // +whole
+    it->groups.resize(n);
+    it->arg_storage.clear();
+    it->arg_storage.reserve(n);
+    it->args.clear();
+    it->args.reserve(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        it->arg_storage.emplace_back(&it->groups[i]);     // Arg points to groups[i]
+        it->args.push_back(&it->arg_storage.back());      // keep Arg* array
+    }
+
+    return it;
+}
+
+extern "C" int re2_iter_next(RE2Iter* it, re2_span_t* out_span) {
+    // Fast path: just whole match. Reuse groups[0].
+    if (!RE2::FindAndConsume(&it->input, it->re->re, &it->groups[0])) {
+        return 0;
+    }
+    const char* base = it->text.data();
+    const re2::StringPiece& m = it->groups[0];
+    out_span->start = static_cast<size_t>(m.data() - base);
+    out_span->len   = static_cast<size_t>(m.size());
+    return 1;
+}
+
+extern "C" int re2_iter_next_captures(RE2Iter* it,
+                                      re2_span_t* out_spans,
+                                      size_t out_spans_len,
+                                      size_t* written) {
+    // Reuse prebuilt Arg* array; no heap work here.
+    if (!RE2::FindAndConsumeN(&it->input, it->re->re, it->args.data(),
+                              static_cast<int>(it->args.size()))) {
+        return 0;
+    }
+
+    const char* base = it->text.data();
+    const size_t n = std::min(out_spans_len, it->groups.size());
+    for (size_t i = 0; i < n; ++i) {
+        const re2::StringPiece& g = it->groups[i];
+        if (g.data() == nullptr) {
+            // Indicate "no capture" with len = 0 (your Rust wrapper already maps this to None)
+            out_spans[i].start = 0;
+            out_spans[i].len   = 0;
+        } else {
+            out_spans[i].start = static_cast<size_t>(g.data() - base);
+            out_spans[i].len   = static_cast<size_t>(g.size());
+        }
+    }
+    *written = n;
+    return 1;
+}
+
+extern "C" void re2_iter_delete(RE2Iter* it) {
+    delete it;
+}
 
 // Return 1 if this build of RE2 has ICU enabled, else 0.
 int re2_has_icu() {

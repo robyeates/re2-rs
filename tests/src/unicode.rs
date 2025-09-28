@@ -105,7 +105,6 @@ fn case_fold_and_replace() {
     assert_eq!(replaced, "world");
 }
 
-#[ignore]
 #[test]
 fn shortest_vs_longest_match() {
     let opts_short = Options::new().longest_match(false);
@@ -125,7 +124,6 @@ fn shortest_vs_longest_match() {
 
 ///should work. Need to check options are being respected
 #[test]
-#[ignore]
 fn shortest_vs_longest_match_latin() {
     let opts_short = Options::new().longest_match(false);
     let opts_long = Options::new().longest_match(true);
@@ -173,7 +171,6 @@ fn unicode_newline_multiline() {
     assert!(re.partial_match(&*text));
 }
 
-#[ignore]
 #[test]
 fn ascii_vs_unicode_word_boundaries() {
     let re = Regex::new(r"\b123\b").unwrap();
